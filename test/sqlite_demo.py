@@ -5,16 +5,16 @@ conn = sqlite3.connect('example.db')
 c = conn.cursor()
 
 # Memeriksa apakah tabel ada sebelum membuatnya
-# c.execute('''CREATE TABLE employees (
-#                     first text,
-#                     last test,
-#                     pay integer
-#                 )''')
+c.execute('''CREATE TABLE employees (
+                    first text,
+                    last test,
+                    pay integer
+                )''')
 
 emp_1 = Employee('John', 'Doe', 8000)
 emp_2 = Employee('Jane', 'Doe', 9000)
 
-# c.execute("INSERT INTO employees VALUES ('Mary', 'Schafer', 7000)")
+c.execute("INSERT INTO employees VALUES ('Mary', 'Schafer', 7000)")
 # c.execute("INSERT INTO employees VALUES ('{}', '{}', {})".format(emp_1.first, emp_1.last, emp_1.pay))
 # c.execute("INSERT INTO employees VALUES (?, ?, ?)", (emp_1.first, emp_1.last, emp_1.pay))
 
@@ -26,11 +26,13 @@ emp_2 = Employee('Jane', 'Doe', 9000)
 # conn.commit()
 
 c.execute("SELECT * FROM employees WHERE last=?", ('Schafer',))
-print(c.fetchall())
+results = c.fetchall()
 
-c.execute("SELECT * FROM employees WHERE last=:last", {'last': 'Doe'})
-print(c.fetchall())
+print(results)
 
-conn.commit()
+# c.execute("SELECT * FROM employees WHERE last=:last", {'last': 'Doe'})
+# print(c.fetchall())
+
+# conn.commit()
 
 conn.close()

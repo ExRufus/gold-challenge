@@ -1,18 +1,20 @@
 # Import Flask and Flask extensions
 from flask import Flask, request
-from flask_restful import Resource, Api
+from flask_restful import Resource, Api  # type: ignore
 from flask_swagger_ui import get_swaggerui_blueprint
-from flask_cors import CORS
+from flask_cors import CORS  # type: ignore
 
 # Import data analysis and visualization libraries
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+from utils.text_preprocessing import clean_text as prc
+
 # Inisiasi object flask
 app = Flask(__name__)
-SWAGGER_URL = '/api/docs'  # URL for exposing Swagger UI (without trailing '/')
-API_URL = '/static/swagger.json'  # Our API url (can of course be a local resource)
+SWAGGER_URL = '/api/docs' 
+API_URL = '/static/swagger.json' 
 
 # Call factory function to create our blueprint
 swaggerui_blueprint = get_swaggerui_blueprint(
@@ -20,19 +22,9 @@ swaggerui_blueprint = get_swaggerui_blueprint(
     API_URL,
     config={  # Swagger UI config overrides
         'app_name': "Test application"
-    },
-    # oauth_config={  # OAuth config. See https://github.com/swagger-api/swagger-ui#oauth2-configuration .
-    #    'clientId': "your-client-id",
-    #    'clientSecret': "your-client-secret-if-required",
-    #    'realm': "your-realms",
-    #    'appName': "your-app-name",
-    #    'scopeSeparator': " ",
-    #    'additionalQueryStringParams': {'test': "hello"}
-    # }
+    }
 )
-
 app.register_blueprint(swaggerui_blueprint)
-
 
 # inisiasi object flask_restful
 api = Api(app)
@@ -41,19 +33,20 @@ api = Api(app)
 CORS(app)
 
 # inisiasi variabel kosong bertipe dictionary
-identitas = {} # variable global , dictionary = json
+identitas = {}  # variable global , dictionary = json
 
 # membuat class Resource
 class ContohResource(Resource):
-    # metode get dan post
     def get(self):
-        # response = {"msg": "Hallo dunia, ini app restfull pertamaku"}
-        return identitas
+        inp = "- disaat semua cowok berusaha melacak perhatia.."
+        return {
+            "original": inp,
+            "processed": prc(inp)}
     
     def post(self):
-        # data: request.json
-        nama = request.form["nama"]
-        umur = request.form["umur"]
+        data = request.get_json()  # assuming the data is sent in JSON format
+        nama = data.get("nama")
+        umur = data.get("umur")
         identitas["nama"] = nama
         identitas["umur"] = umur
         response = {"msg": "Data berhasil dimasukkan"}
@@ -61,10 +54,6 @@ class ContohResource(Resource):
 
 # setup resourcenya
 api.add_resource(ContohResource, "/api", methods=["GET", "POST"])
-
-# @app.route('/')
-# def hello_world():
-#     return 'Hello, World!'
 
 if __name__ == '__main__':
     app.run(debug=True, port=8000)
