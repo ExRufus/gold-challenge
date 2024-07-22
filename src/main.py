@@ -1,5 +1,5 @@
 # Import Flask and Flask extensions
-from flask import Flask, request
+from flask import Flask, request, jsonify
 from flask_restful import Resource, Api  # type: ignore
 from flask_swagger_ui import get_swaggerui_blueprint
 from flask_cors import CORS  # type: ignore
@@ -9,7 +9,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from utils.text_preprocessing import clean_text as prc
+from utils.text_preprocessing import clean_text, alaymap, stop_words  # type: ignore
+import os
 
 # Inisiasi object flask
 app = Flask(__name__)
@@ -35,25 +36,51 @@ CORS(app)
 # inisiasi variabel kosong bertipe dictionary
 identitas = {}  # variable global , dictionary = json
 
-# membuat class Resource
-class ContohResource(Resource):
-    def get(self):
-        inp = "- disaat semua cowok berusaha melacak perhatia.."
-        return {
-            "original": inp,
-            "processed": prc(inp)}
-    
+# Membuat class Resource untuk menerima input teks
+class TextInputResource(Resource):
     def post(self):
-        data = request.get_json()  # assuming the data is sent in JSON format
-        nama = data.get("nama")
-        umur = data.get("umur")
-        identitas["nama"] = nama
-        identitas["umur"] = umur
-        response = {"msg": "Data berhasil dimasukkan"}
-        return response
+        try:
+            json_data = request.get_json(force=True)
+            if not json_data or 'text' not in json_data:
+                return {"error": "No text provided"}, 400
+            
+            text = json_data['text']
+            processed_text = clean_text(text, alaymap, stop_words)
+            
+            return {"original": text, "processed": processed_text}, 200
+        
+        except Exception as e:
+            return {"error": str(e)}, 500
 
-# setup resourcenya
-api.add_resource(ContohResource, "/api", methods=["GET", "POST"])
+# Membuat class Resource untuk menerima input file
+class FileInputResource(Resource):
+    def post(self):
+        if 'file' not in request.files:
+            return {"error": "No file provided"}, 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return {"error": "No file selected"}, 400
+
+        try:
+            df = pd.read_csv(file, encoding='latin1')  # Sesuaikan encoding jika diperlukan
+            results = []
+            for index, row in df.iterrows():
+                text = row.get('Tweet', '')  # Sesuaikan nama kolom sesuai dengan file CSV
+                processed_text = clean_text(text, alaymap, stop_words)
+                results.append({
+                    "original": text,
+                    "processed": processed_text
+                })
+            
+            return {"results": results}, 200
+        
+        except Exception as e:
+            return {"error": str(e)}, 500
+
+# Setup resourcenya
+api.add_resource(TextInputResource, "/api/text", methods=["POST"])
+api.add_resource(FileInputResource, "/api/file", methods=["POST"])
 
 if __name__ == '__main__':
     app.run(debug=True, port=8000)
