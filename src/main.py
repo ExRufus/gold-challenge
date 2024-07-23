@@ -1,42 +1,57 @@
 # Import Flask and Flask extensions
-from flask import Flask, request, jsonify
-from flask_restful import Resource, Api  # type: ignore
+from flask import Flask, request, jsonify, send_from_directory
+from flask_restful import Resource, Api
 from flask_swagger_ui import get_swaggerui_blueprint
-from flask_cors import CORS  # type: ignore
+from flask_cors import CORS
 
 # Import data analysis and visualization libraries
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
 
-from utils.text_preprocessing import clean_text, alaymap, stop_words  # type: ignore
+# Import preprocessing functions
+from utils.hatespeech_predict import textpreprocess, stemmer # type: ignore
 import os
+import sqlite3
 
-# Inisiasi object flask
+# Read stopwords and alaymap from files (replace with actual file paths)
+stop_words = set(pd.read_csv('stopwordbahasa.csv')['stopword'].tolist())
+alaymap = pd.read_csv('alay_dictionary.csv', delimiter=',', header=None)
+alaymap = dict(zip(alaymap[0], alaymap[1]))
+
+# Function to save cleansed data to the database
+def save_to_db(original_text, cleaned_text):
+    conn = sqlite3.connect('cleansed_data.db')
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+    INSERT INTO cleaned_texts (original_text, cleaned_text)
+    VALUES (?, ?)
+    ''', (original_text, cleaned_text))
+    
+    conn.commit()
+    conn.close()
+
+# Initialize Flask app
 app = Flask(__name__)
 SWAGGER_URL = '/api/docs' 
 API_URL = '/static/swagger.json' 
 
-# Call factory function to create our blueprint
 swaggerui_blueprint = get_swaggerui_blueprint(
-    SWAGGER_URL,  # Swagger UI static files will be mapped to '{SWAGGER_URL}/dist/'
+    SWAGGER_URL,
     API_URL,
-    config={  # Swagger UI config overrides
-        'app_name': "Test application"
-    }
+    config={ 'app_name': "Data Cleansing API" }
 )
 app.register_blueprint(swaggerui_blueprint)
 
-# inisiasi object flask_restful
-api = Api(app)
+# Route to serve swagger.json
+@app.route('/static/swagger.json')
+def swagger_json():
+    return send_from_directory(directory='static', path='swagger.json')
 
-# inisiasi object flask_cors
+# Initialize Flask-RESTful
+api = Api(app)
 CORS(app)
 
-# inisiasi variabel kosong bertipe dictionary
-identitas = {}  # variable global , dictionary = json
-
-# Membuat class Resource untuk menerima input teks
+# Resource to handle text input
 class TextInputResource(Resource):
     def post(self):
         try:
@@ -45,14 +60,17 @@ class TextInputResource(Resource):
                 return {"error": "No text provided"}, 400
             
             text = json_data['text']
-            processed_text = clean_text(text, alaymap, stop_words)
+            processed_text = textpreprocess(text, stop_words, alaymap, stemmer)
+            
+            # Save to database
+            save_to_db(text, processed_text)
             
             return {"original": text, "processed": processed_text}, 200
         
         except Exception as e:
             return {"error": str(e)}, 500
 
-# Membuat class Resource untuk menerima input file
+# Resource to handle file input
 class FileInputResource(Resource):
     def post(self):
         if 'file' not in request.files:
@@ -63,22 +81,25 @@ class FileInputResource(Resource):
             return {"error": "No file selected"}, 400
 
         try:
-            df = pd.read_csv(file, encoding='latin1')  # Sesuaikan encoding jika diperlukan
+            df = pd.read_csv(file, encoding='latin1')
             results = []
             for index, row in df.iterrows():
-                text = row.get('Tweet', '')  # Sesuaikan nama kolom sesuai dengan file CSV
-                processed_text = clean_text(text, alaymap, stop_words)
+                text = row.get('Tweet', '')  # Adjust column name according to CSV
+                processed_text = textpreprocess(text, stop_words, alaymap, stemmer)
                 results.append({
                     "original": text,
                     "processed": processed_text
                 })
+                
+                # Save to database
+                save_to_db(text, processed_text)
             
             return {"results": results}, 200
         
         except Exception as e:
             return {"error": str(e)}, 500
 
-# Setup resourcenya
+# Setup resources
 api.add_resource(TextInputResource, "/api/text", methods=["POST"])
 api.add_resource(FileInputResource, "/api/file", methods=["POST"])
 
