@@ -8,14 +8,30 @@ from flask_cors import CORS
 import pandas as pd
 
 # Import preprocessing functions
-from utils.hatespeech_predict import textpreprocess, stemmer # type: ignore
+from utils.hatespeech_predict import textpreprocess, stemmer  # type: ignore
 import os
 import sqlite3
 
-# Read stopwords and alaymap from files (replace with actual file paths)
-stop_words = set(pd.read_csv('stopwordbahasa.csv')['stopword'].tolist())
-alaymap = pd.read_csv('alay_dictionary.csv', delimiter=',', header=None)
-alaymap = dict(zip(alaymap[0], alaymap[1]))
+# Get the absolute path
+base_dir = os.path.dirname(os.path.abspath(__file__))
+stop_words_path = os.path.join(base_dir, '../archive/stopwordbahasa.csv')
+alaymap_path = os.path.join(base_dir, '../archive/alay_dictionary.csv')
+
+# Read the stopwords file
+try:
+    stopwords_df = pd.read_csv(stop_words_path, header=None)
+    stop_words = set(stopwords_df[0].tolist())
+except Exception as e:
+    print(f"Error reading stop words: {e}")
+    stop_words = set()
+    
+# Read the alay dictionary file
+try:
+    alaymap_df = pd.read_csv(alaymap_path, delimiter=',', header=None)
+    alaymap = dict(zip(alaymap_df[0], alaymap_df[1]))
+except Exception as e:
+    print(f"Error reading alay dictionary: {e}")
+    alaymap = {}
 
 # Function to save cleansed data to the database
 def save_to_db(original_text, cleaned_text):
@@ -50,6 +66,8 @@ def swagger_json():
 # Initialize Flask-RESTful
 api = Api(app)
 CORS(app)
+
+
 
 # Resource to handle text input
 class TextInputResource(Resource):
