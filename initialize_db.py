@@ -1,3 +1,5 @@
+# migrations/initialize_db.py
+
 import sqlite3
 
 def init_db():
